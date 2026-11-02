@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Large PDF files and working image directories
+*.pdf
+images/
+
+# External binaries & models
+pdf_studio/bin/
+
+# Uploaded custom fonts (keep folder via .gitkeep)
+pdf_studio/fonts/*
+!pdf_studio/fonts/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db

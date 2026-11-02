@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Text, Font & Resolution Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Readex+Pro:wght@400;600;700&family=Scheherazade+New:wght@400;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style id="custom-fonts-style"></style>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-card: #263349;
+      --bg-input: #0f172a;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Header */
+    header {
+      height: 58px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--accent), var(--primary));
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    select, input[type="text"], input[type="number"], textarea {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+
+    button.btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    button.btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    button.btn-accent {
+      background: var(--accent-hover);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.btn-success {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    button.btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--danger);
+      color: #fca5a5;
+    }
+
+    button.active {
+      background: var(--accent-hover);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar: Block List & Quick Tools */
+    .left-sidebar {
+      width: 250px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .block-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .block-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      transition: all 0.12s;
+    }
+
+    .block-item:hover {
+      border-color: var(--accent);
+    }
+
+    .block-item.selected {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.25);
+      color: #c7d2fe;
+      font-weight: 600;
+    }
+
+    .badge.font-badge {
+      background: rgba(16, 185, 129, 0.25);
+      color: #a7f3d0;
+    }
+
+    /* Center Canvas Viewport */
+    .canvas-area {
+      flex: 1;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .canvas-subbar {
+      height: 42px;
+      background: rgba(30, 41, 59, 0.85);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .viewport-scroll {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px;
+      gap: 20px;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+      border: 1px solid #334155;
+      background: #fff;
+      line-height: 0;
+    }
+
+    canvas#editor-canvas {
+      cursor: crosshair;
+      display: block;
+    }
+
+    .compare-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .compare-panel.visible {
+      display: flex;
+    }
+
+    .compare-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg-panel);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* Right Inspector Sidebar */
+    .right-sidebar {
+      width: 350px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .control-row {
+      margin-bottom: 12px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .control-val {
+      color: var(--accent);
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: var(--bg-input);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    .mode-tab {
+      text-align: center;
+      padding: 7px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      justify-content: center;
+    }
+
+    .mode-tab.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .tashkeel-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 6px 0 10px 0;
+    }
+
+    .tashkeel-btn {
+      font-family: 'Amiri', serif;
+      font-size: 16px;
+      padding: 2px 9px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      cursor: pointer;
+      color: var(--text-main);
+    }
+
+    .tashkeel-btn:hover {
+      border-color: var(--accent);
+      background: var(--bg-card);
+    }
+
+    .color-presets {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      cursor: pointer;
+    }
+
+    .color-swatch.active {
+      border-color: var(--accent);
+      transform: scale(1.12);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 480px;
+      max-width: 95vw;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+
+    .progress-bar-outer {
+      width: 100%;
+      height: 10px;
+      background: var(--bg-input);
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 12px 0;
+      border: 1px solid var(--border);
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    .status-toast {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 200;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <span class="brand-badge">PDF STUDIO</span>
+      <span>Text, Font & Resolution Editor</span>
+    </div>
+
+    <div class="toolbar-group">
+      <label style="font-size:12px;color:var(--text-muted);">PDF:</label>
+      <select id="pdf-select" style="min-width:190px;"></select>
+      <button onclick="document.getElementById('upload-pdf-input').click()" title="Upload another PDF">📂 Upload PDF</button>
+      <input type="file" id="upload-pdf-input" accept=".pdf" style="display:none" onchange="uploadPdfFile(this)" />
+    </div>
+
+    <div class="toolbar-group">
+      <button onclick="changePage(-1)">◀ Prev</button>
+      <span style="font-size:13px;">Page</span>
+      <input type="number" id="page-input" value="1" min="1" style="width:62px;text-align:center;" onchange="goToPage(this.value)" />
+      <span id="page-total-label" style="font-size:13px;color:var(--text-muted);">/ 120</span>
+      <button onclick="changePage(1)">Next ▶</button>
+    </div>
+
+    <div class="toolbar-group">
+      <button id="btn-compare" onclick="toggleCompareMode()">👁️ Compare Original</button>
+      <button class="btn-accent" onclick="openBatchModal()">⚡ Batch All Pages</button>
+      <button class="btn-success" onclick="saveAndDownloadPdf()">💾 Save PDF</button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="workspace">
+    <!-- Left Sidebar -->
+    <div class="left-sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">
+          <span>Page Text Blocks</span>
+          <span id="block-count-badge" class="badge">0</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <button onclick="detectBlocks(true)" style="justify-content:center;">🔍 Re-Detect</button>
+          <button id="btn-draw-box" onclick="toggleDrawBoxMode()" style="justify-content:center;">➕ Draw Box</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button onclick="applyAutoScaleAll()" class="btn-primary" style="justify-content:center;">✨ Auto-Enlarge</button>
+          <button onclick="resetAllBlocksTo1x()" style="justify-content:center;">↺ Reset 1.0×</button>
+        </div>
+      </div>
+
+      <div class="block-list" id="block-list"></div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--border);border-bottom:none;">
+        <div class="section-title">Quick Presets (This Page)</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button onclick="applyPreset(1.35, 0.5, 0.5, 0.2)" style="justify-content:center;">🔥 Large & Bold (+35%)</button>
+          <button onclick="applyPreset(1.25, 0.35, 0.0, 0.15)" style="justify-content:center;">📖 Clean Textbook (+25%)</button>
+          <button onclick="enhanceCurrentPageSR()" style="justify-content:center;">🚀 AI Super-Res (3× GPU)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Canvas Area -->
+    <div class="canvas-area">
+      <div class="canvas-subbar">
+        <div id="canvas-hint">💡 Click any blue box to edit its font/size, drag inside a box to move it, or click "Preview / Apply to Page" to render.</div>
+        <div class="toolbar-group">
+          <span>Zoom:</span>
+          <button onclick="setZoom(0.32)">Fit</button>
+          <button onclick="setZoom(0.45)">45%</button>
+          <button onclick="setZoom(0.65)">65%</button>
+          <button onclick="setZoom(1.0)">100%</button>
+        </div>
+      </div>
+
+      <div class="viewport-scroll">
+        <div class="compare-panel" id="original-compare-panel">
+          <div class="compare-label">Original Page</div>
+          <div class="canvas-wrapper">
+            <img id="original-compare-img" alt="Original Page" style="display:block;" />
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <div class="compare-label" id="editor-label" style="display:none;">Edited Page (Interactive)</div>
+          <div class="canvas-wrapper" id="canvas-container">
+            <canvas id="editor-canvas" width="900" height="1200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Inspector Sidebar -->
+    <div class="right-sidebar">
+      <!-- Page-level actions -->
+      <div class="sidebar-section">
+        <div class="section-title">Page Render & Margin Zoom</div>
+        <div class="control-row">
+          <div class="control-label">
+            <span>Trim Outer Margins (Global Zoom)</span>
+            <span class="control-val" id="val-margin-trim">4.5%</span>
+          </div>
+          <input type="range" id="inp-margin-trim" min="0" max="0.08" step="0.005" value="0.045" oninput="updateMarginTrimLabel(this.value)" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn-primary" onclick="renderPagePreview(false)" style="justify-content:center;padding:8px;">👁️ Preview Page</button>
+          <button class="btn-success" onclick="renderPagePreview(true)" style="justify-content:center;padding:8px;">✅ Commit Page</button>
+        </div>
+        <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span id="commit-status-text" style="font-size:11px;color:var(--text-muted);">Uncommitted preview</span>
+          <button class="btn-danger" onclick="resetCurrentPage()" style="padding:3px 8px;font-size:11px;">Reset Page</button>
+        </div>
+      </div>
+
+      <!-- Selected Block Inspector -->
+      <div class="sidebar-section" id="block-inspector" style="flex:1;">
+        <div class="section-title">
+          <span id="selected-block-title">Selected Block</span>
+          <button class="btn-danger" onclick="deleteSelectedBlock()" style="padding:2px 7px;font-size:11px;">🗑 Delete</button>
+        </div>
+
+        <!-- Mode Tabs -->
+        <div class="mode-tabs">
+          <button class="mode-tab active" id="tab-mode-image" onclick="setBlockMode('image')">🔍 Scale & Boldness</button>
+          <button class="mode-tab" id="tab-mode-font" onclick="setBlockMode('font')">🔤 Custom Font (.ttf)</button>
+        </div>
+
+        <!-- MODE A: Image-Based Scale, Boldness & Color -->
+        <div id="panel-mode-image">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Text Size Scale (Magnification)</span>
+              <span class="control-val" id="val-scale">1.30×</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="range" id="inp-scale" min="0.70" max="1.85" step="0.02" value="1.30" oninput="updateBlockProp('scale', parseFloat(this.value))" />
+              <button onclick="setBlockToAutoScale()" title="Set to collision-free max scale" style="padding:3px 7px;font-size:11px;">Auto</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Font Weight / Stroke Boldness</span>
+              <span class="control-val" id="val-boldness">0.0</span>
+            </div>
+            <input type="range" id="inp-boldness" min="-1.5" max="3.0" step="0.25" value="0.0" oninput="updateBlockProp('boldness', parseFloat(this.value))" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Line Spacing Compaction</span>
+              <span class="control-val" id="val-compaction">35%</span>
+            </div>
+            <input type="range" id="inp-compaction" min="0.0" max="1.0" step="0.05" value="0.35" oninput="updateBlockProp('compaction', parseFloat(this.value))" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Ink Darkness / Contrast</span>
+              <span class="control-val" id="val-darkness">15%</span>
+            </div>
+            <input type="range" id="inp-darkness" min="0.0" max="1.0" step="0.05" value="0.15" oninput="updateBlockProp('darkness', parseFloat(this.value))" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Edge Sharpness</span>
+              <span class="control-val" id="val-sharpness">35%</span>
+            </div>
+            <input type="range" id="inp-sharpness" min="0.0" max="1.0" step="0.05" value="0.35" oninput="updateBlockProp('sharpness', parseFloat(this.value))" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Text Ink Color Override</span>
+              <span class="control-val" id="val-color-override">Original</span>
+            </div>
+            <div class="color-presets">
+              <button onclick="updateBlockProp('color_override', '')" style="padding:3px 8px;font-size:11px;">Original</button>
+              <div class="color-swatch" style="background:#000000;" title="Pure Black" onclick="updateBlockProp('color_override', '#000000')"></div>
+              <div class="color-swatch" style="background:#1e3a8a;" title="Royal Navy" onclick="updateBlockProp('color_override', '#1e3a8a')"></div>
+              <div class="color-swatch" style="background:#065f46;" title="Forest Green" onclick="updateBlockProp('color_override', '#065f46')"></div>
+              <div class="color-swatch" style="background:#991b1b;" title="Deep Red" onclick="updateBlockProp('color_override', '#991b1b')"></div>
+              <input type="color" id="inp-color-override" value="#000000" onchange="updateBlockProp('color_override', this.value)" style="width:28px;height:26px;border:none;background:transparent;cursor:pointer;" />
+            </div>
+          </div>
+
+          <div class="control-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <div class="control-label"><span>Shift X (dx)</span><span class="control-val" id="val-dx">0</span></div>
+              <input type="range" id="inp-dx" min="-250" max="250" step="5" value="0" oninput="updateBlockProp('dx', parseInt(this.value))" />
+            </div>
+            <div>
+              <div class="control-label"><span>Shift Y (dy)</span><span class="control-val" id="val-dy">0</span></div>
+              <input type="range" id="inp-dy" min="-250" max="250" step="5" value="0" oninput="updateBlockProp('dy', parseInt(this.value))" />
+            </div>
+          </div>
+
+          <button onclick="copyBlockStyleToAllOnPage()" style="width:100%;justify-content:center;margin-top:4px;">📋 Apply Style to All Blocks on Page</button>
+        </div>
+
+        <!-- MODE B: Custom Font Replacement & Text Editor -->
+        <div id="panel-mode-font" style="display:none;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button class="btn-accent" onclick="runOcrOnSelectedBlock('ar-SA')" style="flex:1;justify-content:center;">🔍 OCR Arabic</button>
+            <button onclick="runOcrOnSelectedBlock('en-US')" style="justify-content:center;">OCR EN</button>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Editable Text (RTL / Arabic Supported)</span>
+            </div>
+            <textarea id="inp-font-text" dir="rtl" rows="4" style="width:100%;font-family:'Amiri',serif;font-size:18px;line-height:1.6;" placeholder="اكتب النص هنا أو اضغط OCR لاستخراج النص..." oninput="updateBlockProp('text', this.value)"></textarea>
+            <div class="tashkeel-bar">
+              <button class="tashkeel-btn" onclick="insertTashkeel('َ')" title="Fatha">ـَ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ُ')" title="Damma">ـُ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ِ')" title="Kasra">ـِ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ّ')" title="Shadda">ـّ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ْ')" title="Sukun">ـْ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ً')" title="Tanween Fath">ـً</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ٌ')" title="Tanween Damm">ـٌ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ٍ')" title="Tanween Kasr">ـٍ</button>
+              <button class="tashkeel-btn" onclick="insertTashkeel('ـ')" title="Kashida / Tatweel">ـ</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Font Family</span>
+              <button onclick="document.getElementById('upload-font-input').click()" style="padding:1px 6px;font-size:11px;">+ Upload .ttf/.otf</button>
+              <input type="file" id="upload-font-input" accept=".ttf,.otf,.woff,.woff2" style="display:none" onchange="uploadFontFile(this)" />
+            </div>
+            <select id="inp-font-family" style="width:100%;" onchange="updateBlockProp('font_family', this.value)">
+              <optgroup label="Arabic Textbook & Naskh Fonts">
+                <option value="Amiri">Amiri (الأميري - خط نسخ مدرسي)</option>
+                <option value="Scheherazade New">Scheherazade New (شهرزاد - نسخ واضح)</option>
+                <option value="Noto Naskh Arabic">Noto Naskh Arabic (نوتو نسخ)</option>
+                <option value="Lateef">Lateef (لطيف)</option>
+                <option value="Traditional Arabic">Traditional Arabic (الخط العربي التقليدي)</option>
+                <option value="Sakkal Majalla">Sakkal Majalla (مجلة صقال)</option>
+                <option value="Simplified Arabic">Simplified Arabic (العربي المبسط)</option>
+              </optgroup>
+              <optgroup label="Modern Arabic & Sans Fonts">
+                <option value="Cairo">Cairo (القاهرة)</option>
+                <option value="Tajawal">Tajawal (تجول)</option>
+                <option value="Almarai">Almarai (المراعي)</option>
+                <option value="Readex Pro">Readex Pro</option>
+                <option value="Dubai">Dubai (دبي)</option>
+                <option value="Arial">Arial</option>
+              </optgroup>
+              <optgroup label="Uploaded Custom Fonts" id="custom-fonts-optgroup"></optgroup>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Font Size (px at 216 DPI)</span>
+              <span class="control-val" id="val-font-size">42 px</span>
+            </div>
+            <input type="range" id="inp-font-size" min="18" max="120" step="1" value="42" oninput="updateBlockProp('font_size', parseInt(this.value))" />
+          </div>
+
+          <div class="control-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <div class="control-label"><span>Font Weight</span></div>
+              <select id="inp-font-weight" style="width:100%;" onchange="updateBlockProp('font_weight', this.value)">
+                <option value="400">Normal (400)</option>
+                <option value="700">Bold (700)</option>
+              </select>
+            </div>
+            <div>
+              <div class="control-label"><span>Alignment</span></div>
+              <select id="inp-font-align" style="width:100%;" onchange="updateBlockProp('align', this.value)">
+                <option value="right">Right (يمين)</option>
+                <option value="center">Center (وسط)</option>
+                <option value="left">Left (يسار)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-row" style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;">
+            <div>
+              <div class="control-label">
+                <span>Line Height</span>
+                <span class="control-val" id="val-line-height">1.65</span>
+              </div>
+              <input type="range" id="inp-line-height" min="1.10" max="2.40" step="0.05" value="1.65" oninput="updateBlockProp('line_height', parseFloat(this.value))" />
+            </div>
+            <div>
+              <div class="control-label"><span>Color</span></div>
+              <input type="color" id="inp-font-color" value="#111111" onchange="updateBlockProp('text_color', this.value)" style="width:36px;height:30px;border:none;background:transparent;cursor:pointer;" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch Process Modal -->
+  <div class="modal-backdrop" id="batch-modal">
+    <div class="modal-card">
+      <h3 style="margin-bottom:6px;font-size:16px;">⚡ Batch Enlarge & Style Entire PDF</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+        Automatically detects text blocks across the selected page range, enlarges text without colliding with illustrations, and applies your chosen font boldness and margin zoom.
+      </p>
+
+      <div class="control-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="control-label"><span>Start Page</span></div>
+          <input type="number" id="batch-start-page" value="1" min="1" style="width:100%;" />
+        </div>
+        <div>
+          <div class="control-label"><span>End Page</span></div>
+          <input type="number" id="batch-end-page" value="120" min="1" style="width:100%;" />
+        </div>
+      </div>
+
+      <div class="control-row">
+        <div class="control-label">
+          <span>Max In-Place Text Scale</span>
+          <span class="control-val" id="val-batch-scale">1.35×</span>
+        </div>
+        <input type="range" id="batch-scale" min="1.0" max="1.60" step="0.05" value="1.35" oninput="document.getElementById('val-batch-scale').textContent=parseFloat(this.value).toFixed(2)+'×'" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label">
+          <span>Stroke Boldness (Font Weight)</span>
+          <span class="control-val" id="val-batch-bold">0.25</span>
+        </div>
+        <input type="range" id="batch-boldness" min="-1.0" max="2.5" step="0.25" value="0.25" oninput="document.getElementById('val-batch-bold').textContent=this.value" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label">
+          <span>Outer Margin Trim (Global Zoom)</span>
+          <span class="control-val" id="val-batch-trim">4.5%</span>
+        </div>
+        <input type="range" id="batch-trim" min="0.0" max="0.07" step="0.005" value="0.045" oninput="document.getElementById('val-batch-trim').textContent=(parseFloat(this.value)*100).toFixed(1)+'%'" />
+      </div>
+
+      <div class="control-row" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="batch-clean-bg" />
+        <label for="batch-clean-bg" style="font-size:13px;">Also clean JPEG background noise & boost contrast</label>
+      </div>
+
+      <div class="control-row">
+        <div class="control-label"><span>Output PDF Filename</span></div>
+        <input type="text" id="batch-output-name" value="1871_custom_enlarged.pdf" style="width:100%;" />
+      </div>
+
+      <div id="batch-progress-area" style="display:none;">
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="batch-progress-bar"></div>
+        </div>
+        <div id="batch-status-text" style="font-size:12px;color:var(--accent);text-align:center;">Processing...</div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button onclick="closeBatchModal()">Close</button>
+        <button class="btn-primary" id="btn-start-batch" onclick="startBatchProcess()">🚀 Start Batch Processing</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-toast" id="status-toast"></div>
+
+  <script>
+    let currentPdf = null;
+    let totalPages = 1;
+    let currentPage = 1;
+    let pageWidth = 1808;
+    let pageHeight = 2424;
+    let zoomFactor = 0.34;
+
+    let basePageImg = new Image();
+    let previewRenderedImg = null; // Image when backend preview is active
+    let showPreviewImage = false;
+    let compareMode = false;
+
+    let blocks = [];
+    let selectedBlockIdx = -1;
+
+    // Mouse interaction state
+    let drawBoxMode = false;
+    let isDragging = false;
+    let dragType = null; // 'move', 'resize-br', 'new-box'
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOrigVals = null;
+
+    const canvas = document.getElementById('editor-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function showToast(msg, duration = 2600) {
+      const el = document.getElementById('status-toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.style.display = 'none'; }, duration);
+    }
+
+    async function initApp() {
+      const res = await fetch('/api/files');
+      const data = await res.json();
+      populateFilesDropdown(data.pdfs, data.active_pdf);
+      populateCustomFonts(data.custom_fonts);
+
+      // Automatically open 1871_high_res.pdf or first available PDF
+      if (data.pdfs.length > 0) {
+        const preferred = data.pdfs.find(p => p.name === '1871_high_res.pdf') || data.pdfs[0];
+        await openPdf(preferred.name);
+      }
+    }
+
+    function populateFilesDropdown(pdfs, activeName) {
+      const sel = document.getElementById('pdf-select');
+      sel.innerHTML = '';
+      pdfs.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = `${p.name} (${p.size_mb} MB)`;
+        if (p.name === activeName) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => openPdf(sel.value);
+    }
+
+    function populateCustomFonts(fonts) {
+      const group = document.getElementById('custom-fonts-optgroup');
+      const styleEl = document.getElementById('custom-fonts-style');
+      group.innerHTML = '';
+      let css = '';
+      fonts.forEach(f => {
+        css += `@font-face { font-family: '${f.name}'; src: url('${f.url}'); }\n`;
+        const opt = document.createElement('option');
+        opt.value = f.name;
+        opt.textContent = `${f.name} (Custom)`;
+        group.appendChild(opt);
+      });
+      styleEl.textContent = css;
+    }
+
+    async function openPdf(filename) {
+      showToast(`Opening ${filename}...`);
+      const res = await fetch('/api/open_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+      const data = await res.json();
+      currentPdf = data.filename;
+      totalPages = data.page_count;
+      document.getElementById('page-total-label').textContent = `/ ${totalPages}`;
+      document.getElementById('batch-end-page').value = totalPages;
+      document.getElementById('pdf-select').value = currentPdf;
+      await loadPage(1);
+    }
+
+    async function uploadPdfFile(input) {
+      if (!input.files || !input.files[0]) return;
+      const fd = new FormData();
+      fd.append('file', input.files[0]);
+      showToast('Uploading PDF...');
+      const res = await fetch('/api/upload_pdf', { method: 'POST', body: fd });
+      const data = await res.json();
+      const filesRes = await fetch('/api/files');
+      const filesData = await filesRes.json();
+      populateFilesDropdown(filesData.pdfs, data.filename);
+      await openPdf(data.filename);
+    }
+
+    async function uploadFontFile(input) {
+      if (!input.files || !input.files[0]) return;
+      const fd = new FormData();
+      fd.append('file', input.files[0]);
+      showToast('Uploading custom font...');
+      const res = await fetch('/api/upload_font', { method: 'POST', body: fd });
+      const data = await res.json();
+      const filesRes = await fetch('/api/files');
+      const filesData = await filesRes.json();
+      populateCustomFonts(filesData.custom_fonts);
+      if (data.font) {
+        document.getElementById('inp-font-family').value = data.font.name;
+        updateBlockProp('font_family', data.font.name);
+        showToast(`Loaded font: ${data.font.name}`);
+      }
+    }
+
+    async function loadPage(pno) {
+      currentPage = Math.max(1, Math.min(totalPages, parseInt(pno) || 1));
+      document.getElementById('page-input').value = currentPage;
+      showPreviewImage = false;
+      previewRenderedImg = null;
+
+      // Load base image & detect blocks
+      const imgUrl = `/api/page/${currentPage}/image?t=${Date.now()}`;
+      document.getElementById('original-compare-img').src = `/api/page/${currentPage}/image?original=1&t=${Date.now()}`;
+
+      await new Promise((resolve) => {
+        basePageImg.onload = resolve;
+        basePageImg.src = imgUrl;
+      });
+
+      pageWidth = basePageImg.naturalWidth || 1808;
+      pageHeight = basePageImg.naturalHeight || 2424;
+      updateCanvasDimensions();
+
+      await detectBlocks(false);
+    }
+
+    function changePage(delta) {
+      loadPage(currentPage + delta);
+    }
+
+    function goToPage(val) {
+      loadPage(parseInt(val) || 1);
+    }
+
+    function setZoom(z) {
+      zoomFactor = z;
+      updateCanvasDimensions();
+      drawCanvas();
+    }
+
+    function updateCanvasDimensions() {
+      const dispW = Math.round(pageWidth * zoomFactor);
+      const dispH = Math.round(pageHeight * zoomFactor);
+      canvas.width = dispW;
+      canvas.height = dispH;
+      const origImg = document.getElementById('original-compare-img');
+      origImg.style.width = dispW + 'px';
+      origImg.style.height = dispH + 'px';
+    }
+
+    function toggleCompareMode() {
+      compareMode = !compareMode;
+      document.getElementById('btn-compare').classList.toggle('active', compareMode);
+      document.getElementById('original-compare-panel').classList.toggle('visible', compareMode);
+      document.getElementById('editor-label').style.display = compareMode ? 'block' : 'none';
+    }
+
+    async function detectBlocks(force = false) {
+      showToast('Detecting text blocks...');
+      const res = await fetch(`/api/page/${currentPage}/detect_blocks?force=${force ? 1 : 0}`);
+      const data = await res.json();
+      blocks = data.blocks || [];
+      selectedBlockIdx = blocks.length > 0 ? 0 : -1;
+      document.getElementById('commit-status-text').textContent = data.is_committed ? '✅ Committed to PDF' : 'Uncommitted preview';
+      renderBlockList();
+      syncInspectorToSelectedBlock();
+      drawCanvas();
+    }
+
+    function renderBlockList() {
+      const listEl = document.getElementById('block-list');
+      document.getElementById('block-count-badge').textContent = blocks.length;
+      listEl.innerHTML = '';
+      blocks.forEach((b, idx) => {
+        const div = document.createElement('div');
+        div.className = 'block-item' + (idx === selectedBlockIdx ? ' selected' : '');
+        const badgeText = b.mode === 'font'
+          ? `${b.font_family} (${b.font_size}px)`
+          : `${parseFloat(b.scale).toFixed(2)}×`;
+        div.innerHTML = `
+          <span>Block #${idx + 1}</span>
+          <span class="badge ${b.mode === 'font' ? 'font-badge' : ''}">${badgeText}</span>
+        `;
+        div.onclick = () => {
+          selectedBlockIdx = idx;
+          renderBlockList();
+          syncInspectorToSelectedBlock();
+          drawCanvas();
+        };
+        listEl.appendChild(div);
+      });
+    }
+
+    function syncInspectorToSelectedBlock() {
+      const inspector = document.getElementById('block-inspector');
+      if (selectedBlockIdx < 0 || selectedBlockIdx >= blocks.length) {
+        inspector.style.opacity = '0.4';
+        inspector.style.pointerEvents = 'none';
+        return;
+      }
+      inspector.style.opacity = '1';
+      inspector.style.pointerEvents = 'auto';
+
+      const b = blocks[selectedBlockIdx];
+      document.getElementById('selected-block-title').textContent = `Block #${selectedBlockIdx + 1} (${b.x2 - b.x1}×${b.y2 - b.y1})`;
+
+      const isFont = b.mode === 'font';
+      document.getElementById('tab-mode-image').classList.toggle('active', !isFont);
+      document.getElementById('tab-mode-font').classList.toggle('active', isFont);
+      document.getElementById('panel-mode-image').style.display = isFont ? 'none' : 'block';
+      document.getElementById('panel-mode-font').style.display = isFont ? 'block' : 'none';
+
+      // Image mode controls
+      document.getElementById('inp-scale').value = b.scale;
+      document.getElementById('val-scale').textContent = parseFloat(b.scale).toFixed(2) + '×';
+      document.getElementById('inp-boldness').value = b.boldness || 0;
+      document.getElementById('val-boldness').textContent = (b.boldness > 0 ? '+' : '') + parseFloat(b.boldness || 0).toFixed(2);
+      document.getElementById('inp-compaction').value = b.compaction || 0;
+      document.getElementById('val-compaction').textContent = Math.round((b.compaction || 0) * 100) + '%';
+      document.getElementById('inp-darkness').value = b.darkness ?? 0.15;
+      document.getElementById('val-darkness').textContent = Math.round((b.darkness ?? 0.15) * 100) + '%';
+      document.getElementById('inp-sharpness').value = b.sharpness ?? 0.35;
+      document.getElementById('val-sharpness').textContent = Math.round((b.sharpness ?? 0.35) * 100) + '%';
+      document.getElementById('val-color-override').textContent = b.color_override || 'Original';
+      document.getElementById('inp-dx').value = b.dx || 0;
+      document.getElementById('val-dx').textContent = b.dx || 0;
+      document.getElementById('inp-dy').value = b.dy || 0;
+      document.getElementById('val-dy').textContent = b.dy || 0;
+
+      // Font mode controls
+      document.getElementById('inp-font-text').value = b.text || '';
+      document.getElementById('inp-font-text').style.fontFamily = `'${b.font_family || 'Amiri'}', serif`;
+      document.getElementById('inp-font-family').value = b.font_family || 'Amiri';
+      document.getElementById('inp-font-size').value = b.font_size || 42;
+      document.getElementById('val-font-size').textContent = (b.font_size || 42) + ' px';
+      document.getElementById('inp-font-weight').value = b.font_weight || '400';
+      document.getElementById('inp-font-align').value = b.align || 'right';
+      document.getElementById('inp-line-height').value = b.line_height || 1.65;
+      document.getElementById('val-line-height').textContent = parseFloat(b.line_height || 1.65).toFixed(2);
+      document.getElementById('inp-font-color').value = b.text_color || '#111111';
+    }
+
+    function setBlockMode(mode) {
+      if (selectedBlockIdx < 0) return;
+      blocks[selectedBlockIdx].mode = mode;
+      showPreviewImage = false;
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      drawCanvas();
+      if (mode === 'font' && !blocks[selectedBlockIdx].text) {
+        runOcrOnSelectedBlock('ar-SA');
+      }
+    }
+
+    function updateBlockProp(prop, val) {
+      if (selectedBlockIdx < 0) return;
+      blocks[selectedBlockIdx][prop] = val;
+      showPreviewImage = false;
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      drawCanvas();
+    }
+
+    function setBlockToAutoScale() {
+      if (selectedBlockIdx < 0) return;
+      const b = blocks[selectedBlockIdx];
+      b.scale = b.auto_scale || 1.30;
+      showPreviewImage = false;
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      drawCanvas();
+    }
+
+    function copyBlockStyleToAllOnPage() {
+      if (selectedBlockIdx < 0) return;
+      const src = blocks[selectedBlockIdx];
+      blocks.forEach(b => {
+        b.scale = src.scale;
+        b.boldness = src.boldness;
+        b.compaction = src.compaction;
+        b.darkness = src.darkness;
+        b.sharpness = src.sharpness;
+        b.color_override = src.color_override;
+      });
+      showPreviewImage = false;
+      renderBlockList();
+      drawCanvas();
+      showToast('Copied style to all blocks on this page!');
+    }
+
+    function applyAutoScaleAll() {
+      blocks.forEach(b => {
+        b.mode = 'image';
+        b.scale = b.auto_scale || 1.30;
+      });
+      showPreviewImage = false;
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      renderPagePreview(false);
+    }
+
+    function resetAllBlocksTo1x() {
+      blocks.forEach(b => {
+        b.mode = 'image';
+        b.scale = 1.0;
+        b.boldness = 0.0;
+        b.compaction = 0.0;
+        b.dx = 0;
+        b.dy = 0;
+        b.color_override = '';
+      });
+      showPreviewImage = false;
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      drawCanvas();
+    }
+
+    function applyPreset(scale, compaction, boldness, darkness) {
+      blocks.forEach(b => {
+        b.mode = 'image';
+        b.scale = Math.min(scale, (b.auto_scale || 1.30) * 1.05);
+        b.compaction = compaction;
+        b.boldness = boldness;
+        b.darkness = darkness;
+      });
+      syncInspectorToSelectedBlock();
+      renderBlockList();
+      renderPagePreview(false);
+    }
+
+    function deleteSelectedBlock() {
+      if (selectedBlockIdx < 0) return;
+      blocks.splice(selectedBlockIdx, 1);
+      selectedBlockIdx = blocks.length > 0 ? Math.min(selectedBlockIdx, blocks.length - 1) : -1;
+      showPreviewImage = false;
+      renderBlockList();
+      syncInspectorToSelectedBlock();
+      drawCanvas();
+    }
+
+    function toggleDrawBoxMode() {
+      drawBoxMode = !drawBoxMode;
+      document.getElementById('btn-draw-box').classList.toggle('active', drawBoxMode);
+      if (drawBoxMode) {
+        showToast('Click and drag on the page canvas to draw a new text block.');
+      }
+    }
+
+    function updateMarginTrimLabel(val) {
+      document.getElementById('val-margin-trim').textContent = (parseFloat(val) * 100).toFixed(1) + '%';
+    }
+
+    function insertTashkeel(ch) {
+      const ta = document.getElementById('inp-font-text');
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const txt = ta.value;
+      ta.value = txt.substring(0, start) + ch + txt.substring(end);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + ch.length;
+      updateBlockProp('text', ta.value);
+    }
+
+    async function runOcrOnSelectedBlock(lang = 'ar-SA') {
+      if (selectedBlockIdx < 0) return;
+      const b = blocks[selectedBlockIdx];
+      showToast(`Running ${lang} OCR on Block #${selectedBlockIdx + 1}...`);
+      const res = await fetch(`/api/page/${currentPage}/ocr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x1: b.x1, y1: b.y1, x2: b.x2, y2: b.y2, lang })
+      });
+      const data = await res.json();
+      if (data.text) {
+        b.text = data.text;
+        syncInspectorToSelectedBlock();
+        drawCanvas();
+        showToast('OCR text extracted!');
+      } else {
+        showToast('No OCR text detected — you can type directly in the box.');
+      }
+    }
+
+    // Draw custom-font blocks onto an offscreen canvas at full page resolution (pageWidth x pageHeight)
+    function renderFontBlocksOverlayCanvas() {
+      const off = document.createElement('canvas');
+      off.width = pageWidth;
+      off.height = pageHeight;
+      const octx = off.getContext('2d');
+
+      let hasFontBlocks = false;
+      blocks.forEach(b => {
+        if (b.mode !== 'font' || !b.text) return;
+        hasFontBlocks = true;
+        const bx = b.x1 + (b.dx || 0);
+        const by = b.y1 + (b.dy || 0);
+        const bw = b.x2 - b.x1;
+        const bh = b.y2 - b.y1;
+
+        const fSize = b.font_size || 42;
+        const fFamily = b.font_family || 'Amiri';
+        const fWeight = b.font_weight || '400';
+        const lHeight = (b.line_height || 1.65) * fSize;
+        const align = b.align || 'right';
+
+        octx.save();
+        octx.font = `${fWeight} ${fSize}px '${fFamily}', serif`;
+        octx.fillStyle = b.text_color || '#111111';
+        octx.direction = 'rtl';
+        octx.textBaseline = 'top';
+
+        const rawLines = b.text.split('\n');
+        let curY = by + 6;
+        rawLines.forEach(line => {
+          let drawX = bx + bw - 8;
+          if (align === 'center') {
+            octx.textAlign = 'center';
+            drawX = bx + bw / 2;
+          } else if (align === 'left') {
+            octx.textAlign = 'left';
+            drawX = bx + 8;
+          } else {
+            octx.textAlign = 'right';
+            drawX = bx + bw - 8;
+          }
+          octx.fillText(line, drawX, curY);
+          curY += lHeight;
+        });
+        octx.restore();
+      });
+
+      return { canvas: off, hasFontBlocks };
+    }
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (showPreviewImage && previewRenderedImg) {
+        ctx.drawImage(previewRenderedImg, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.drawImage(basePageImg, 0, 0, canvas.width, canvas.height);
+
+        // Live preview of blocks on client canvas before backend commit
+        blocks.forEach((b, idx) => {
+          const sx = b.x1 * zoomFactor;
+          const sy = b.y1 * zoomFactor;
+          const sw = (b.x2 - b.x1) * zoomFactor;
+          const sh = (b.y2 - b.y1) * zoomFactor;
+
+          if (b.mode === 'font') {
+            // Erase original box with white and draw custom font live
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(sx, sy, sw, sh);
+          } else if (Math.abs((b.scale || 1.0) - 1.0) > 0.01 || b.dx || b.dy) {
+            // Live client-side scaled preview of image block
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(sx, sy, sw, sh);
+            const nw = sw * (b.scale || 1.0);
+            const nh = sh * (b.scale || 1.0);
+            const cx = sx + sw / 2 + (b.dx || 0) * zoomFactor;
+            const cy = sy + sh / 2 + (b.dy || 0) * zoomFactor;
+            ctx.drawImage(
+              basePageImg,
+              b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1,
+              cx - nw / 2, cy - nh / 2, nw, nh
+            );
+          }
+        });
+
+        // Draw font overlay if any block is in font mode
+        const { canvas: fontOff, hasFontBlocks } = renderFontBlocksOverlayCanvas();
+        if (hasFontBlocks) {
+          ctx.drawImage(fontOff, 0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      // Draw interactive selection boxes & handles
+      blocks.forEach((b, idx) => {
+        const isSel = idx === selectedBlockIdx;
+        const scale = b.mode === 'image' ? (b.scale || 1.0) : 1.0;
+        const bw = (b.x2 - b.x1) * scale * zoomFactor;
+        const bh = (b.y2 - b.y1) * scale * zoomFactor;
+        const cx = ((b.x1 + b.x2) / 2 + (b.dx || 0)) * zoomFactor;
+        const cy = ((b.y1 + b.y2) / 2 + (b.dy || 0)) * zoomFactor;
+        const rx = cx - bw / 2;
+        const ry = cy - bh / 2;
+
+        ctx.save();
+        ctx.strokeStyle = isSel ? '#38bdf8' : 'rgba(99, 102, 241, 0.65)';
+        ctx.lineWidth = isSel ? 2.2 : 1.2;
+        ctx.setLineDash(isSel ? [] : [5, 4]);
+        ctx.strokeRect(rx, ry, bw, bh);
+
+        // Tag pill
+        const label = b.mode === 'font' ? `#${idx+1} ${b.font_family}` : `#${idx+1} (${parseFloat(b.scale).toFixed(2)}×)`;
+        ctx.font = '600 11px Inter, sans-serif';
+        const tw = ctx.measureText(label).width + 10;
+        ctx.fillStyle = isSel ? '#0284c7' : 'rgba(30, 41, 59, 0.85)';
+        ctx.fillRect(rx, Math.max(0, ry - 18), tw, 18);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, rx + 5, Math.max(13, ry - 5));
+
+        // Bottom-right resize handle for selected block
+        if (isSel) {
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(rx + bw - 6, ry + bh - 6, 10, 10);
+        }
+        ctx.restore();
+      });
+    }
+
+    // Canvas Mouse Events for Selecting, Moving, Resizing, or Drawing Boxes
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) / zoomFactor;
+      const my = (e.clientY - rect.top) / zoomFactor;
+
+      if (drawBoxMode) {
+        isDragging = true;
+        dragType = 'new-box';
+        dragStartX = mx;
+        dragStartY = my;
+        return;
+      }
+
+      // Check if clicking bottom-right resize handle of selected block
+      if (selectedBlockIdx >= 0) {
+        const b = blocks[selectedBlockIdx];
+        const scale = b.mode === 'image' ? (b.scale || 1.0) : 1.0;
+        const bw = (b.x2 - b.x1) * scale;
+        const bh = (b.y2 - b.y1) * scale;
+        const cx = (b.x1 + b.x2) / 2 + (b.dx || 0);
+        const cy = (b.y1 + b.y2) / 2 + (b.dy || 0);
+        const brX = cx + bw / 2;
+        const brY = cy + bh / 2;
+        if (Math.abs(mx - brX) < 22 / zoomFactor && Math.abs(my - brY) < 22 / zoomFactor) {
+          isDragging = true;
+          dragType = 'resize-br';
+          dragStartX = mx;
+          dragStartY = my;
+          dragOrigVals = { x2: b.x2, y2: b.y2, scale: b.scale };
+          return;
+        }
+      }
+
+      // Check if clicking inside any block
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        const b = blocks[i];
+        const scale = b.mode === 'image' ? (b.scale || 1.0) : 1.0;
+        const bw = (b.x2 - b.x1) * scale;
+        const bh = (b.y2 - b.y1) * scale;
+        const cx = (b.x1 + b.x2) / 2 + (b.dx || 0);
+        const cy = (b.y1 + b.y2) / 2 + (b.dy || 0);
+        if (mx >= cx - bw / 2 && mx <= cx + bw / 2 && my >= cy - bh / 2 && my <= cy + bh / 2) {
+          selectedBlockIdx = i;
+          isDragging = true;
+          dragType = 'move';
+          dragStartX = mx;
+          dragStartY = my;
+          dragOrigVals = { dx: b.dx || 0, dy: b.dy || 0 };
+          renderBlockList();
+          syncInspectorToSelectedBlock();
+          drawCanvas();
+          return;
+        }
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) / zoomFactor;
+      const my = (e.clientY - rect.top) / zoomFactor;
+
+      if (dragType === 'move' && selectedBlockIdx >= 0) {
+        const b = blocks[selectedBlockIdx];
+        b.dx = Math.round(dragOrigVals.dx + (mx - dragStartX));
+        b.dy = Math.round(dragOrigVals.dy + (my - dragStartY));
+        showPreviewImage = false;
+        syncInspectorToSelectedBlock();
+        drawCanvas();
+      } else if (dragType === 'resize-br' && selectedBlockIdx >= 0) {
+        const b = blocks[selectedBlockIdx];
+        if (b.mode === 'image') {
+          const origW = Math.max(20, b.x2 - b.x1);
+          const newScale = Math.max(0.7, Math.min(1.85, dragOrigVals.scale + (mx - dragStartX) / origW));
+          b.scale = Math.round(newScale * 100) / 100;
+        } else {
+          b.x2 = Math.max(b.x1 + 40, Math.round(dragOrigVals.x2 + (mx - dragStartX)));
+          b.y2 = Math.max(b.y1 + 30, Math.round(dragOrigVals.y2 + (my - dragStartY)));
+        }
+        showPreviewImage = false;
+        syncInspectorToSelectedBlock();
+        renderBlockList();
+        drawCanvas();
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isDragging) return;
+      if (dragType === 'new-box') {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / zoomFactor;
+        const my = (e.clientY - rect.top) / zoomFactor;
+        const x1 = Math.round(Math.min(dragStartX, mx));
+        const y1 = Math.round(Math.min(dragStartY, my));
+        const x2 = Math.round(Math.max(dragStartX, mx));
+        const y2 = Math.round(Math.max(dragStartY, my));
+        if (x2 - x1 > 25 && y2 - y1 > 18) {
+          blocks.push({
+            id: `block_${blocks.length + 1}`,
+            x1, y1, x2, y2,
+            mode: 'image',
+            scale: 1.25,
+            auto_scale: 1.25,
+            compaction: 0.25,
+            dx: 0, dy: 0,
+            boldness: 0.0,
+            darkness: 0.15,
+            sharpness: 0.35,
+            color_override: '',
+            text: '',
+            font_family: 'Amiri',
+            font_size: 42,
+            font_weight: '400',
+            line_height: 1.65,
+            align: 'right',
+            text_color: '#111111'
+          });
+          selectedBlockIdx = blocks.length - 1;
+          drawBoxMode = false;
+          document.getElementById('btn-draw-box').classList.remove('active');
+          renderBlockList();
+          syncInspectorToSelectedBlock();
+          drawCanvas();
+        }
+      }
+      isDragging = false;
+      dragType = null;
+    });
+
+    async function renderPagePreview(commit = false) {
+      showToast(commit ? 'Rendering & committing page edits...' : 'Rendering high-res preview...');
+      const marginTrim = parseFloat(document.getElementById('inp-margin-trim').value || 0);
+      const { canvas: fontOff, hasFontBlocks } = renderFontBlocksOverlayCanvas();
+      const fontOverlayPng = hasFontBlocks ? fontOff.toDataURL('image/png') : '';
+
+      const res = await fetch(`/api/page/${currentPage}/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          blocks,
+          margin_trim: marginTrim,
+          commit,
+          font_overlay_png: fontOverlayPng
+        })
+      });
+      const data = await res.json();
+      if (data.image_data_url) {
+        const img = new Image();
+        img.onload = () => {
+          previewRenderedImg = img;
+          showPreviewImage = true;
+          drawCanvas();
+          document.getElementById('commit-status-text').textContent = commit ? '✅ Committed to PDF' : '👁️ Showing high-res preview';
+          showToast(commit ? `Page ${currentPage} committed!` : 'Preview updated!');
+        };
+        img.src = data.image_data_url;
+      }
+    }
+
+    async function resetCurrentPage() {
+      await fetch(`/api/page/${currentPage}/reset`, { method: 'POST' });
+      await loadPage(currentPage);
+      showToast(`Reset Page ${currentPage} to original.`);
+    }
+
+    async function enhanceCurrentPageSR() {
+      showToast('Running 3× AI Super-Resolution (Intel Arc GPU) on this page...');
+      const res = await fetch(`/api/page/${currentPage}/enhance_sr`, { method: 'POST' });
+      const data = await res.json();
+      if (data.image_data_url) {
+        await loadPage(currentPage);
+        showToast('Page enhanced with 3× AI Super-Resolution!');
+      }
+    }
+
+    async function saveAndDownloadPdf() {
+      // Commit current page first if there are blocks
+      await renderPagePreview(true);
+      const defaultName = currentPdf ? currentPdf.replace('.pdf', '_studio_edited.pdf') : 'edited_output.pdf';
+      const outName = prompt('Enter filename to save in your ALI workspace folder:', defaultName);
+      if (!outName) return;
+
+      showToast(`Saving ${outName}...`);
+      const res = await fetch('/api/save_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ output_filename: outName })
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        showToast(`Saved ${data.filename} (${data.size_mb} MB)! Starting download...`, 4000);
+        const filesRes = await fetch('/api/files');
+        const filesData = await filesRes.json();
+        populateFilesDropdown(filesData.pdfs, currentPdf);
+        window.open(data.download_url, '_blank');
+      }
+    }
+
+    // Batch Processing Modal
+    function openBatchModal() {
+      document.getElementById('batch-modal').classList.add('open');
+    }
+
+    function closeBatchModal() {
+      document.getElementById('batch-modal').classList.remove('open');
+    }
+
+    async function startBatchProcess() {
+      const payload = {
+        start_page: parseInt(document.getElementById('batch-start-page').value) || 1,
+        end_page: parseInt(document.getElementById('batch-end-page').value) || totalPages,
+        max_scale: parseFloat(document.getElementById('batch-scale').value) || 1.35,
+        boldness: parseFloat(document.getElementById('batch-boldness').value) || 0.0,
+        margin_trim: parseFloat(document.getElementById('batch-trim').value) || 0.045,
+        clean_bg: document.getElementById('batch-clean-bg').checked,
+        output_filename: document.getElementById('batch-output-name').value.trim()
+      };
+
+      document.getElementById('batch-progress-area').style.display = 'block';
+      document.getElementById('btn-start-batch').disabled = true;
+
+      await fetch('/api/batch_start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const poll = setInterval(async () => {
+        const res = await fetch('/api/batch_status');
+        const st = await res.json();
+        const pct = st.total > 0 ? Math.round((st.current / st.total) * 100) : 0;
+        document.getElementById('batch-progress-bar').style.width = pct + '%';
+        document.getElementById('batch-status-text').textContent = `${st.status} (${pct}%)`;
+
+        if (!st.running) {
+          clearInterval(poll);
+          document.getElementById('btn-start-batch').disabled = false;
+          if (st.status === 'completed') {
+            document.getElementById('batch-status-text').textContent = `✅ Completed! Saved to ${st.output_file}`;
+            const filesRes = await fetch('/api/files');
+            const filesData = await filesRes.json();
+            populateFilesDropdown(filesData.pdfs, currentPdf);
+            showToast(`Batch PDF saved as ${st.output_file}!`, 4000);
+          } else if (st.error) {
+            document.getElementById('batch-status-text').textContent = `❌ Error: ${st.error}`;
+          }
+        }
+      }, 1000);
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
