@@ -593,6 +593,19 @@
         <div id="panel-mode-image">
           <div class="control-row">
             <div class="control-label">
+              <span>Arabic Font Character (يحفظ الحركات والتنسيق)</span>
+            </div>
+            <select id="inp-font-style" style="width:100%;" onchange="updateBlockProp('font_style', this.value)">
+              <option value="original">Original Textbook Font (الخط الأصلي)</option>
+              <option value="naskh_calligraphic">Naskh Calligraphic Nib (خط نسخ عريض - قلم خطاط)</option>
+              <option value="ruqah_chisel">Ruq'ah Chisel Nib (خط رقعة مائل)</option>
+              <option value="heavy_textbook">Heavy Bold Textbook (خط مدرسي عريض وواضح)</option>
+              <option value="modern_sans">Modern Rounded Print (خط عصري ناعم)</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
               <span>Text Size Scale (Magnification)</span>
               <span class="control-val" id="val-scale">1.30×</span>
             </div>
@@ -612,10 +625,18 @@
 
           <div class="control-row">
             <div class="control-label">
-              <span>Line Spacing Compaction</span>
+              <span>Line Spacing Compaction (بين الأسطر)</span>
               <span class="control-val" id="val-compaction">35%</span>
             </div>
             <input type="range" id="inp-compaction" min="0.0" max="1.0" step="0.05" value="0.35" oninput="updateBlockProp('compaction', parseFloat(this.value))" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Column Spacing Compaction (بين الأعمدة)</span>
+              <span class="control-val" id="val-col-compaction">0%</span>
+            </div>
+            <input type="range" id="inp-col-compaction" min="0.0" max="1.0" step="0.05" value="0.0" oninput="updateBlockProp('col_compaction', parseFloat(this.value))" />
           </div>
 
           <div class="control-row">
@@ -1014,6 +1035,9 @@
       renderBlockList();
       syncInspectorToSelectedBlock();
       drawCanvas();
+      if (blocks.length > 0) {
+        scheduleLiveRender(60);
+      }
     }
 
     function renderBlockList() {
@@ -1060,12 +1084,15 @@
       document.getElementById('panel-mode-font').style.display = isFont ? 'block' : 'none';
 
       // Image mode controls
+      document.getElementById('inp-font-style').value = b.font_style || 'original';
       document.getElementById('inp-scale').value = b.scale;
       document.getElementById('val-scale').textContent = parseFloat(b.scale).toFixed(2) + '×';
       document.getElementById('inp-boldness').value = b.boldness || 0;
       document.getElementById('val-boldness').textContent = (b.boldness > 0 ? '+' : '') + parseFloat(b.boldness || 0).toFixed(2);
       document.getElementById('inp-compaction').value = b.compaction || 0;
       document.getElementById('val-compaction').textContent = Math.round((b.compaction || 0) * 100) + '%';
+      document.getElementById('inp-col-compaction').value = b.col_compaction || 0;
+      document.getElementById('val-col-compaction').textContent = Math.round((b.col_compaction || 0) * 100) + '%';
       document.getElementById('inp-darkness').value = b.darkness ?? 0.15;
       document.getElementById('val-darkness').textContent = Math.round((b.darkness ?? 0.15) * 100) + '%';
       document.getElementById('inp-sharpness').value = b.sharpness ?? 0.35;
@@ -1080,60 +1107,68 @@
       document.getElementById('inp-font-text').value = b.text || '';
       document.getElementById('inp-font-text').style.fontFamily = `'${b.font_family || 'Amiri'}', serif`;
       document.getElementById('inp-font-family').value = b.font_family || 'Amiri';
-      document.getElementById('inp-font-size').value = b.font_size || 42;
-      document.getElementById('val-font-size').textContent = (b.font_size || 42) + ' px';
-      document.getElementById('inp-font-weight').value = b.font_weight || '400';
+      document.getElementById('inp-font-size').value = b.font_size || 52;
+      document.getElementById('val-font-size').textContent = (b.font_size || 52) + ' px';
+      document.getElementById('inp-font-weight').value = b.font_weight || '700';
       document.getElementById('inp-font-align').value = b.align || 'right';
       document.getElementById('inp-line-height').value = b.line_height || 1.65;
       document.getElementById('val-line-height').textContent = parseFloat(b.line_height || 1.65).toFixed(2);
       document.getElementById('inp-font-color').value = b.text_color || '#111111';
     }
 
+    let _liveRenderTimer = null;
+    function scheduleLiveRender(delay = 120) {
+      clearTimeout(_liveRenderTimer);
+      _liveRenderTimer = setTimeout(() => {
+        renderPagePreview(false, true);
+      }, delay);
+    }
+
     function setBlockMode(mode) {
       if (selectedBlockIdx < 0) return;
       blocks[selectedBlockIdx].mode = mode;
-      showPreviewImage = false;
       syncInspectorToSelectedBlock();
       renderBlockList();
-      drawCanvas();
       if (mode === 'font' && !blocks[selectedBlockIdx].text) {
         runOcrOnSelectedBlock('ar-SA');
+      } else {
+        scheduleLiveRender(60);
       }
     }
 
     function updateBlockProp(prop, val) {
       if (selectedBlockIdx < 0) return;
       blocks[selectedBlockIdx][prop] = val;
-      showPreviewImage = false;
       syncInspectorToSelectedBlock();
       renderBlockList();
       drawCanvas();
+      scheduleLiveRender(120);
     }
 
     function setBlockToAutoScale() {
       if (selectedBlockIdx < 0) return;
       const b = blocks[selectedBlockIdx];
       b.scale = b.auto_scale || 1.30;
-      showPreviewImage = false;
       syncInspectorToSelectedBlock();
       renderBlockList();
-      drawCanvas();
+      scheduleLiveRender(60);
     }
 
     function copyBlockStyleToAllOnPage() {
       if (selectedBlockIdx < 0) return;
       const src = blocks[selectedBlockIdx];
       blocks.forEach(b => {
+        b.font_style = src.font_style || 'original';
         b.scale = src.scale;
         b.boldness = src.boldness;
         b.compaction = src.compaction;
+        b.col_compaction = src.col_compaction || 0;
         b.darkness = src.darkness;
         b.sharpness = src.sharpness;
         b.color_override = src.color_override;
       });
-      showPreviewImage = false;
       renderBlockList();
-      drawCanvas();
+      scheduleLiveRender(60);
       showToast('Copied style to all blocks on this page!');
     }
 
@@ -1142,7 +1177,6 @@
         b.mode = 'image';
         b.scale = b.auto_scale || 1.30;
       });
-      showPreviewImage = false;
       syncInspectorToSelectedBlock();
       renderBlockList();
       renderPagePreview(false);
@@ -1151,17 +1185,18 @@
     function resetAllBlocksTo1x() {
       blocks.forEach(b => {
         b.mode = 'image';
+        b.font_style = 'original';
         b.scale = 1.0;
         b.boldness = 0.0;
         b.compaction = 0.0;
+        b.col_compaction = 0.0;
         b.dx = 0;
         b.dy = 0;
         b.color_override = '';
       });
-      showPreviewImage = false;
       syncInspectorToSelectedBlock();
       renderBlockList();
-      drawCanvas();
+      scheduleLiveRender(60);
     }
 
     function applyPreset(scale, compaction, boldness, darkness) {
@@ -1181,10 +1216,9 @@
       if (selectedBlockIdx < 0) return;
       blocks.splice(selectedBlockIdx, 1);
       selectedBlockIdx = blocks.length > 0 ? Math.min(selectedBlockIdx, blocks.length - 1) : -1;
-      showPreviewImage = false;
       renderBlockList();
       syncInspectorToSelectedBlock();
-      drawCanvas();
+      scheduleLiveRender(60);
     }
 
     function toggleDrawBoxMode() {
@@ -1197,6 +1231,7 @@
 
     function updateMarginTrimLabel(val) {
       document.getElementById('val-margin-trim').textContent = (parseFloat(val) * 100).toFixed(1) + '%';
+      scheduleLiveRender(150);
     }
 
     function insertTashkeel(ch) {
@@ -1222,10 +1257,12 @@
       const data = await res.json();
       if (data.text) {
         b.text = data.text;
+        b.ocr_cells = data.cells || [];
         syncInspectorToSelectedBlock();
-        drawCanvas();
-        showToast('OCR text extracted!');
+        scheduleLiveRender(60);
+        showToast('OCR text extracted! Multi-column cells separated with |');
       } else {
+        scheduleLiveRender(60);
         showToast('No OCR text detected — you can type directly in the box.');
       }
     }
@@ -1246,9 +1283,9 @@
         const bw = b.x2 - b.x1;
         const bh = b.y2 - b.y1;
 
-        const fSize = b.font_size || 42;
+        const fSize = b.font_size || 52;
         const fFamily = b.font_family || 'Amiri';
-        const fWeight = b.font_weight || '400';
+        const fWeight = b.font_weight || '700';
         const lHeight = (b.line_height || 1.65) * fSize;
         const align = b.align || 'right';
 
@@ -1259,26 +1296,74 @@
         octx.textBaseline = 'top';
 
         const rawLines = b.text.split('\n');
-        let curY = by + 6;
+        let curY = by + 8;
         rawLines.forEach(line => {
-          let drawX = bx + bw - 8;
-          if (align === 'center') {
-            octx.textAlign = 'center';
-            drawX = bx + bw / 2;
-          } else if (align === 'left') {
-            octx.textAlign = 'left';
-            drawX = bx + 8;
+          // Support multi-column rows separated by '|' (RTL columns across the block width)
+          if (line.includes('|')) {
+            const cols = line.split('|').map(s => s.trim()).filter(Boolean);
+            const nCols = cols.length;
+            if (nCols > 0) {
+              const colW = bw / nCols;
+              cols.forEach((colText, cIdx) => {
+                // Column 0 is rightmost in RTL
+                const colRightX = bx + bw - cIdx * colW;
+                const colCenterX = colRightX - colW / 2;
+                octx.textAlign = 'center';
+                octx.fillText(colText, colCenterX, curY);
+              });
+            }
           } else {
-            octx.textAlign = 'right';
-            drawX = bx + bw - 8;
+            let drawX = bx + bw - 12;
+            if (align === 'center') {
+              octx.textAlign = 'center';
+              drawX = bx + bw / 2;
+            } else if (align === 'left') {
+              octx.textAlign = 'left';
+              drawX = bx + 12;
+            } else {
+              octx.textAlign = 'right';
+              drawX = bx + bw - 12;
+            }
+            octx.fillText(line, drawX, curY);
           }
-          octx.fillText(line, drawX, curY);
           curY += lHeight;
         });
         octx.restore();
       });
 
       return { canvas: off, hasFontBlocks };
+    }
+
+    function getTrimParams() {
+      const mt = showPreviewImage ? parseFloat(document.getElementById('inp-margin-trim').value || 0) : 0;
+      if (mt > 0.002) {
+        const tx = Math.round(pageWidth * Math.min(0.08, mt));
+        const ty = Math.round(pageHeight * Math.min(0.08, mt));
+        if (tx > 2 && ty > 2) {
+          return { tx, ty, sx: pageWidth / (pageWidth - 2 * tx), sy: pageHeight / (pageHeight - 2 * ty) };
+        }
+      }
+      return { tx: 0, ty: 0, sx: 1.0, sy: 1.0 };
+    }
+
+    function pageToTrimX(px) {
+      const t = getTrimParams();
+      return (px - t.tx) * t.sx;
+    }
+
+    function pageToTrimY(py) {
+      const t = getTrimParams();
+      return (py - t.ty) * t.sy;
+    }
+
+    function trimToPageX(vx) {
+      const t = getTrimParams();
+      return t.tx + vx / t.sx;
+    }
+
+    function trimToPageY(vy) {
+      const t = getTrimParams();
+      return t.ty + vy / t.sy;
     }
 
     function drawCanvas() {
@@ -1288,34 +1373,6 @@
         ctx.drawImage(previewRenderedImg, 0, 0, canvas.width, canvas.height);
       } else {
         ctx.drawImage(basePageImg, 0, 0, canvas.width, canvas.height);
-
-        // Live preview of blocks on client canvas before backend commit
-        blocks.forEach((b, idx) => {
-          const sx = b.x1 * zoomFactor;
-          const sy = b.y1 * zoomFactor;
-          const sw = (b.x2 - b.x1) * zoomFactor;
-          const sh = (b.y2 - b.y1) * zoomFactor;
-
-          if (b.mode === 'font') {
-            // Erase original box with white and draw custom font live
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(sx, sy, sw, sh);
-          } else if (Math.abs((b.scale || 1.0) - 1.0) > 0.01 || b.dx || b.dy) {
-            // Live client-side scaled preview of image block
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(sx, sy, sw, sh);
-            const nw = sw * (b.scale || 1.0);
-            const nh = sh * (b.scale || 1.0);
-            const cx = sx + sw / 2 + (b.dx || 0) * zoomFactor;
-            const cy = sy + sh / 2 + (b.dy || 0) * zoomFactor;
-            ctx.drawImage(
-              basePageImg,
-              b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1,
-              cx - nw / 2, cy - nh / 2, nw, nh
-            );
-          }
-        });
-
         // Draw font overlay if any block is in font mode
         const { canvas: fontOff, hasFontBlocks } = renderFontBlocksOverlayCanvas();
         if (hasFontBlocks) {
@@ -1323,16 +1380,21 @@
         }
       }
 
-      // Draw interactive selection boxes & handles
+      const t = getTrimParams();
+
+      // Draw interactive selection boxes & handles (aligned with margin-trim zoom & compacted dimensions!)
       blocks.forEach((b, idx) => {
         const isSel = idx === selectedBlockIdx;
         const scale = b.mode === 'image' ? (b.scale || 1.0) : 1.0;
-        const bw = (b.x2 - b.x1) * scale * zoomFactor;
-        const bh = (b.y2 - b.y1) * scale * zoomFactor;
-        const cx = ((b.x1 + b.x2) / 2 + (b.dx || 0)) * zoomFactor;
-        const cy = ((b.y1 + b.y2) / 2 + (b.dy || 0)) * zoomFactor;
-        const rx = cx - bw / 2;
-        const ry = cy - bh / 2;
+        const pageBw = (b.mode === 'image' && b.render_w) ? b.render_w : (b.x2 - b.x1) * scale;
+        const pageBh = (b.mode === 'image' && b.render_h) ? b.render_h : (b.y2 - b.y1) * scale;
+        const pageCx = (b.x1 + b.x2) / 2 + (b.dx || 0);
+        const pageCy = (b.y1 + b.y2) / 2 + (b.dy || 0);
+
+        const rx = pageToTrimX(pageCx - pageBw / 2) * zoomFactor;
+        const ry = pageToTrimY(pageCy - pageBh / 2) * zoomFactor;
+        const bw = pageBw * t.sx * zoomFactor;
+        const bh = pageBh * t.sy * zoomFactor;
 
         ctx.save();
         ctx.strokeStyle = isSel ? '#38bdf8' : 'rgba(99, 102, 241, 0.65)';
@@ -1361,8 +1423,8 @@
     // Canvas Mouse Events for Selecting, Moving, Resizing, or Drawing Boxes
     canvas.addEventListener('mousedown', (e) => {
       const rect = canvas.getBoundingClientRect();
-      const mx = (e.clientX - rect.left) / zoomFactor;
-      const my = (e.clientY - rect.top) / zoomFactor;
+      const mx = trimToPageX((e.clientX - rect.left) / zoomFactor);
+      const my = trimToPageY((e.clientY - rect.top) / zoomFactor);
 
       if (drawBoxMode) {
         isDragging = true;
@@ -1418,8 +1480,8 @@
     window.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
       const rect = canvas.getBoundingClientRect();
-      const mx = (e.clientX - rect.left) / zoomFactor;
-      const my = (e.clientY - rect.top) / zoomFactor;
+      const mx = trimToPageX((e.clientX - rect.left) / zoomFactor);
+      const my = trimToPageY((e.clientY - rect.top) / zoomFactor);
 
       if (dragType === 'move' && selectedBlockIdx >= 0) {
         const b = blocks[selectedBlockIdx];
@@ -1447,10 +1509,11 @@
 
     window.addEventListener('mouseup', (e) => {
       if (!isDragging) return;
+      const prevDragType = dragType;
       if (dragType === 'new-box') {
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) / zoomFactor;
-        const my = (e.clientY - rect.top) / zoomFactor;
+        const mx = trimToPageX((e.clientX - rect.left) / zoomFactor);
+        const my = trimToPageY((e.clientY - rect.top) / zoomFactor);
         const x1 = Math.round(Math.min(dragStartX, mx));
         const y1 = Math.round(Math.min(dragStartY, my));
         const x2 = Math.round(Math.max(dragStartX, mx));
@@ -1460,6 +1523,7 @@
             id: `block_${blocks.length + 1}`,
             x1, y1, x2, y2,
             mode: 'image',
+            font_style: 'original',
             scale: 1.25,
             auto_scale: 1.25,
             compaction: 0.25,
@@ -1469,9 +1533,10 @@
             sharpness: 0.35,
             color_override: '',
             text: '',
+            ocr_cells: [],
             font_family: 'Amiri',
-            font_size: 42,
-            font_weight: '400',
+            font_size: 52,
+            font_weight: '700',
             line_height: 1.65,
             align: 'right',
             text_color: '#111111'
@@ -1486,10 +1551,15 @@
       }
       isDragging = false;
       dragType = null;
+      if (prevDragType) {
+        scheduleLiveRender(80);
+      }
     });
 
-    async function renderPagePreview(commit = false) {
-      showToast(commit ? 'Rendering & committing page edits...' : 'Rendering high-res preview...');
+    async function renderPagePreview(commit = false, silent = false) {
+      if (!silent) {
+        showToast(commit ? 'Rendering & committing page edits...' : 'Rendering high-res preview...');
+      }
       const marginTrim = parseFloat(document.getElementById('inp-margin-trim').value || 0);
       const { canvas: fontOff, hasFontBlocks } = renderFontBlocksOverlayCanvas();
       const fontOverlayPng = hasFontBlocks ? fontOff.toDataURL('image/png') : '';
@@ -1505,14 +1575,22 @@
         })
       });
       const data = await res.json();
+      if (data.blocks && data.blocks.length === blocks.length) {
+        data.blocks.forEach((rb, i) => {
+          blocks[i].render_w = rb.render_w;
+          blocks[i].render_h = rb.render_h;
+        });
+      }
       if (data.image_data_url) {
         const img = new Image();
         img.onload = () => {
           previewRenderedImg = img;
           showPreviewImage = true;
           drawCanvas();
-          document.getElementById('commit-status-text').textContent = commit ? '✅ Committed to PDF' : '👁️ Showing high-res preview';
-          showToast(commit ? `Page ${currentPage} committed!` : 'Preview updated!');
+          document.getElementById('commit-status-text').textContent = commit ? '✅ Committed to PDF' : '👁️ Live high-res preview';
+          if (!silent) {
+            showToast(commit ? `Page ${currentPage} committed!` : 'Preview updated!');
+          }
         };
         img.src = data.image_data_url;
       }
@@ -1528,6 +1606,12 @@
       showToast('Running 3× AI Super-Resolution (Intel Arc GPU) on this page...');
       const res = await fetch(`/api/page/${currentPage}/enhance_sr`, { method: 'POST' });
       const data = await res.json();
+      if (data.blocks && data.blocks.length === blocks.length) {
+        data.blocks.forEach((rb, i) => {
+          blocks[i].render_w = rb.render_w;
+          blocks[i].render_h = rb.render_h;
+        });
+      }
       if (data.image_data_url) {
         await loadPage(currentPage);
         showToast('Page enhanced with 3× AI Super-Resolution!');

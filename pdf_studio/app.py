@@ -195,11 +195,11 @@ def ocr_block(page_num: int, payload: Dict[str, Any] = Body(...)):
     doc.close()
 
     if native_text:
-        return {"text": native_text, "source": "pdf_text"}
+        return {"text": native_text, "cells": [], "source": "pdf_text"}
 
     patch_bgr = img_bgr[y1:y2, x1:x2]
-    ocr_text = engine.ocr_image_patch(patch_bgr, lang=lang)
-    return {"text": ocr_text, "source": "windows_ocr"}
+    res = engine.ocr_image_patch_detailed(patch_bgr, lang=lang)
+    return {"text": res.get("text", ""), "cells": res.get("cells", []), "source": "windows_ocr"}
 
 
 @app.post("/api/page/{page_num}/render")
@@ -251,6 +251,7 @@ def render_page_edits(page_num: int, payload: Dict[str, Any] = Body(...)):
     return {
         "status": "ok",
         "committed": commit,
+        "blocks": blocks,
         "image_data_url": f"data:image/jpeg;base64,{b64_jpg}",
     }
 
