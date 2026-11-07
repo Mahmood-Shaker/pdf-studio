@@ -488,6 +488,7 @@
 
     <div class="toolbar-group">
       <button id="btn-compare" onclick="toggleCompareMode()">👁️ Compare Original</button>
+      <button class="btn-primary" onclick="openDocxModal()">📄 Export RTL Word (.docx)</button>
       <button class="btn-accent" onclick="openBatchModal()">⚡ Batch All Pages</button>
       <button class="btn-success" onclick="saveAndDownloadPdf()">💾 Save PDF</button>
     </div>
@@ -844,6 +845,71 @@
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
         <button onclick="closeBatchModal()">Close</button>
         <button class="btn-primary" id="btn-start-batch" onclick="startBatchProcess()">🚀 Start Batch Processing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export RTL Word (.docx) Modal -->
+  <div class="modal-backdrop" id="docx-modal">
+    <div class="modal-card">
+      <h3 style="margin-bottom:6px;font-size:16px;">📄 Convert PDF to RTL Arabic Word (.docx)</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+        Generates a Microsoft Word document with native Right-to-Left (<code>&lt;w:bidi/&gt;</code> &amp; <code>&lt;w:bidiVisual/&gt;</code>) Arabic tables, paragraphs, and cropped illustrations/headers.
+      </p>
+
+      <div class="control-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="control-label"><span>Start Page</span></div>
+          <input type="number" id="docx-start-page" value="13" min="1" style="width:100%;" />
+        </div>
+        <div>
+          <div class="control-label"><span>End Page</span></div>
+          <input type="number" id="docx-end-page" value="13" min="1" style="width:100%;" />
+        </div>
+      </div>
+
+      <div class="control-row">
+        <div class="control-label"><span>Word Layout Mode</span></div>
+        <select id="docx-mode" style="width:100%;">
+          <option value="editable">OCR Text + Cropped Images (Editable RTL Tables + Cropped Illustrations/Headers)</option>
+          <option value="hybrid_crops">Include Reference Text Crops Above Tables</option>
+          <option value="visual">Visual High-Res (Full Enhanced Studio Pages in Word)</option>
+        </select>
+      </div>
+
+      <div class="control-row" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+        <div>
+          <div class="control-label"><span>Arabic Word Font</span></div>
+          <select id="docx-font-name" style="width:100%;">
+            <option value="Traditional Arabic">Traditional Arabic (الخط العربي التقليدي)</option>
+            <option value="Sakkal Majalla">Sakkal Majalla (مجلة صقال)</option>
+            <option value="Amiri">Amiri (الأميري)</option>
+            <option value="Simplified Arabic">Simplified Arabic (العربي المبسط)</option>
+            <option value="Cairo">Cairo (القاهرة)</option>
+            <option value="Arial">Arial</option>
+          </select>
+        </div>
+        <div>
+          <div class="control-label"><span>Font Size (pt)</span></div>
+          <input type="number" id="docx-font-size" value="22" min="12" max="48" style="width:100%;" />
+        </div>
+      </div>
+
+      <div class="control-row">
+        <div class="control-label"><span>Output Word Filename (.docx)</span></div>
+        <input type="text" id="docx-output-name" value="1871_rtl_arabic.docx" style="width:100%;" />
+      </div>
+
+      <div id="docx-progress-area" style="display:none;">
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="docx-progress-bar"></div>
+        </div>
+        <div id="docx-status-text" style="font-size:12px;color:var(--accent);text-align:center;">Processing...</div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button onclick="closeDocxModal()">Close</button>
+        <button class="btn-primary" id="btn-export-docx" onclick="exportRtlDocx()">📥 Generate &amp; Download .docx</button>
       </div>
     </div>
   </div>
@@ -1648,6 +1714,92 @@
 
     function closeBatchModal() {
       document.getElementById('batch-modal').classList.remove('open');
+    }
+
+    // RTL Word (.docx) Export Modal
+    function openDocxModal() {
+      document.getElementById('docx-start-page').value = currentPage;
+      document.getElementById('docx-end-page').value = currentPage;
+      const base = currentPdf ? currentPdf.replace(/\.pdf$/i, '') : 'output';
+      document.getElementById('docx-output-name').value = `${base}_p${currentPage}_rtl.docx`;
+      document.getElementById('docx-progress-area').style.display = 'none';
+      document.getElementById('docx-progress-bar').style.width = '0%';
+      document.getElementById('docx-modal').classList.add('open');
+    }
+
+    function closeDocxModal() {
+      document.getElementById('docx-modal').classList.remove('open');
+    }
+
+    async function exportRtlDocx() {
+      const btn = document.getElementById('btn-export-docx');
+      const progArea = document.getElementById('docx-progress-area');
+      const progBar = document.getElementById('docx-progress-bar');
+      const statusEl = document.getElementById('docx-status-text');
+      const startPage = parseInt(document.getElementById('docx-start-page').value) || currentPage;
+      const endPage = parseInt(document.getElementById('docx-end-page').value) || startPage;
+      const mode = document.getElementById('docx-mode').value;
+      const fontName = document.getElementById('docx-font-name').value;
+      const fontSizePt = parseInt(document.getElementById('docx-font-size').value) || 22;
+      const outName = document.getElementById('docx-output-name').value.trim();
+
+      btn.disabled = true;
+      progArea.style.display = 'block';
+      progBar.style.width = '2%';
+      statusEl.textContent = `⏳ Starting RTL Word export for page(s) ${startPage}–${endPage}...`;
+
+      try {
+        const res = await fetch('/api/export_docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start_page: startPage,
+            end_page: endPage,
+            mode,
+            font_name: fontName,
+            font_size_pt: fontSizePt,
+            output_filename: outName
+          })
+        });
+        const data = await res.json();
+        if (data.status !== 'started') {
+          statusEl.textContent = `❌ Error: ${data.detail || 'Failed to start .docx export'}`;
+          btn.disabled = false;
+          return;
+        }
+
+        const poll = setInterval(async () => {
+          try {
+            const stRes = await fetch('/api/export_docx_status');
+            const st = await stRes.json();
+            const pct = st.total > 0 ? Math.round((st.current / st.total) * 100) : 0;
+            progBar.style.width = pct + '%';
+            statusEl.textContent = `${st.status} (${pct}%)`;
+
+            if (!st.running) {
+              clearInterval(poll);
+              btn.disabled = false;
+              if (st.status === 'completed') {
+                progBar.style.width = '100%';
+                statusEl.textContent = `✅ Saved ${st.output_file} (${st.size_kb} KB)! Downloading...`;
+                showToast(`Exported ${st.output_file}!`, 3500);
+                if (st.download_url) {
+                  window.open(st.download_url, '_blank');
+                }
+              } else {
+                statusEl.textContent = `❌ Error: ${st.error || 'Export failed'}`;
+              }
+            }
+          } catch (e) {
+            clearInterval(poll);
+            btn.disabled = false;
+            statusEl.textContent = `❌ Connection error: ${e.message}`;
+          }
+        }, 700);
+      } catch (err) {
+        statusEl.textContent = `❌ Error: ${err.message}`;
+        btn.disabled = false;
+      }
     }
 
     async function startBatchProcess() {

@@ -8,8 +8,9 @@ venv/
 .venv/
 env/
 
-# Large PDF files and working image directories
+# Large PDF files, Word exports, and working image directories
 *.pdf
+*.docx
 images/
 
 # External binaries & models

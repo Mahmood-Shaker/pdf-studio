@@ -639,28 +639,202 @@ def render_blocks_on_page(img_bgr, blocks, margin_trim=0.045):
 
 
 def ocr_image_patch_detailed(patch_bgr, lang="ar-SA"):
-    """Run Windows built-in OCR on an image patch, stripping colored diacritics/obstacles for cleaner word recognition and returning positioned cells."""
-    # Pre-clean colored diacritics (pink/red harakat) and background tint so Windows OCR reads Arabic letters cleanly
-    lab = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (35, 35))
-    bg_l = cv2.morphologyEx(l, cv2.MORPH_DILATE, k)
-    diff_l = bg_l.astype(np.float32) - l.astype(np.float32)
-    chroma = np.sqrt((a.astype(np.float32) - 128.0) ** 2 + (b.astype(np.float32) - 128.0) ** 2)
+    """Run dual-scale Windows OCR on a per-row cell-compacted canvas with row-band harakat cleaning and initial-form syllable completion."""
+    if patch_bgr is None or patch_bgr.size == 0:
+        return {"text": "", "cells": [], "rows_table": []}
 
-    clean_patch = np.full_like(patch_bgr, 255)
-    dark_letters = (diff_l > 24.0) & (chroma < 24.0)
-    if np.sum(dark_letters) > 30:
-        clean_patch[dark_letters] = patch_bgr[dark_letters]
-    else:
-        clean_patch = patch_bgr.copy()
+    white = is_white_mask(patch_bgr)
+    ink = (~white).astype(np.uint8)
+    nl, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
 
-    pad = 24
+    bodies = []
+    for i in range(1, nl):
+        x, y, w, h, area = stats[i]
+        if w > 180 and h < 28:
+            continue
+        if area >= 155 and (h >= 24 or w >= 24):
+            bodies.append((i, x, y, w, h, area))
+
+    bodies.sort(key=lambda b: b[2] + b[4] * 0.7)
+    body_rows = []
+    for b in bodies:
+        by = b[2] + b[4] * 0.7
+        if not body_rows or abs(by - np.mean([x[2] + x[4] * 0.7 for x in body_rows[-1]])) > 45:
+            body_rows.append([b])
+        else:
+            body_rows[-1].append(b)
+
+    harakat_mask = np.zeros_like(ink)
+    harakat_list = []
+    for i in range(1, nl):
+        x, y, w, h, area = stats[i]
+        ar = w / float(max(1, h))
+        if w > 180 and h < 28:
+            harakat_mask[labels == i] = 1
+            continue
+        if area >= 255 or h >= 28 or w >= 22:
+            continue
+        cy = y + h * 0.5
+        best_row = None
+        best_dist = 1e9
+        for r in body_rows:
+            rcy = np.mean([b[2] + b[4] * 0.5 for b in r])
+            if abs(cy - rcy) < best_dist:
+                best_dist = abs(cy - rcy)
+                best_row = r
+
+        is_fatha_kasra = (10 <= w <= 15) and (6 <= h <= 11) and (20 <= area <= 56) and (ar >= 1.15)
+        is_tanween_shadda = (12 <= w <= 19) and (11 <= h <= 24) and (50 <= area <= 250) and (ar <= 1.30)
+        is_single_dot = (7 <= w <= 10) and (7 <= h <= 10) and (36 <= area <= 58) and (0.80 <= ar <= 1.25)
+        is_double_dot = (13 <= w <= 16) and (8 <= h <= 10) and (68 <= area <= 90) and (ar >= 1.40)
+
+        is_haraka = False
+        if best_row is not None:
+            row_top = np.percentile([b[2] for b in best_row], 25)
+            row_bot = np.percentile([b[2] + b[4] for b in best_row], 75)
+            if y < row_top - 5 and not (is_single_dot or is_double_dot):
+                is_haraka = True
+            elif y + h > row_bot + 4 and not (is_single_dot or is_double_dot):
+                is_haraka = True
+        if is_fatha_kasra:
+            is_haraka = True
+        elif is_tanween_shadda and not (is_single_dot or is_double_dot):
+            if best_row is not None and y < np.percentile([b[2] for b in best_row], 35) - 10:
+                is_haraka = True
+        if is_haraka and area >= 18:
+            harakat_mask[labels == i] = 1
+            harakat_list.append((x, y, w, h, area))
+
+    h_dil = cv2.dilate(harakat_mask, np.ones((5, 5), np.uint8), iterations=1)
+    bg = estimate_local_background(patch_bgr)
+    clean = patch_bgr.copy()
+    clean[h_dil > 0] = bg[h_dil > 0]
+
+    lab = cv2.cvtColor(clean, cv2.COLOR_BGR2LAB)
+    l_ch, a_ch, b_ch = cv2.split(lab)
+    bg_lab = cv2.cvtColor(bg, cv2.COLOR_BGR2LAB)
+    bg_l, bg_a, bg_b = cv2.split(bg_lab)
+    diff_l = np.maximum(0.0, bg_l.astype(np.float32) - l_ch.astype(np.float32))
+    diff_c = np.sqrt((a_ch.astype(np.float32) - bg_a.astype(np.float32)) ** 2 + (b_ch.astype(np.float32) - bg_b.astype(np.float32)) ** 2)
+    ink_strength = np.clip((np.maximum(diff_l, diff_c * 1.6) - 10.0) / 80.0, 0.0, 1.0)
+    gray_out = np.clip(255.0 * (1.0 - ink_strength * 0.92), 0, 255).astype(np.uint8)
+    clean_bgr = cv2.cvtColor(gray_out, cv2.COLOR_GRAY2BGR)
+    clean_ink = (gray_out < 215).astype(np.uint8)
+
+    row_mask = np.sum(cv2.dilate(clean_ink, np.ones((15, 45), np.uint8)), axis=1) > 0
+    rows_y = []
+    in_r, st = False, 0
+    for y in range(len(row_mask)):
+        if row_mask[y] and not in_r:
+            in_r, st = True, y
+        elif not row_mask[y] and in_r:
+            in_r = False
+            if y - st >= 16:
+                rows_y.append((st, y))
+    if in_r and len(row_mask) - st >= 16:
+        rows_y.append((st, len(row_mask)))
+
+    if not rows_y:
+        return {"text": "", "cells": [], "rows_table": []}
+
+    is_rtl = lang.lower().startswith("ar")
+    ocr_canvas = clean_bgr.copy()
+    syllable_cells = {}
+    grid_rows = []
+    for r_i, (y0, y1) in enumerate(rows_y):
+        r_ink = clean_ink[y0:y1, :]
+        col_mask = np.sum(cv2.dilate(r_ink, np.ones((5, 5), np.uint8)), axis=0) > 0
+        spans = []
+        in_c, cx0 = False, 0
+        for x in range(len(col_mask)):
+            if col_mask[x] and not in_c:
+                in_c, cx0 = True, x
+            elif not col_mask[x] and in_c:
+                in_c = False
+                spans.append([cx0, x])
+        if in_c:
+            spans.append([cx0, len(col_mask)])
+        cells = []
+        for sp in spans:
+            if not cells or sp[0] - cells[-1][1] >= 55:
+                cells.append(sp)
+            else:
+                cells[-1][1] = sp[1]
+        if is_rtl:
+            cells.reverse()
+        if not cells:
+            continue
+        grid_rows.append((y0, y1, cells))
+        row_idx = len(grid_rows) - 1
+        for c_i, (x0, x1) in enumerate(cells):
+            c_ink = r_ink[:, x0:x1]
+            ys_all, xs_all = np.where(c_ink > 0)
+            if len(ys_all) == 0:
+                continue
+            ch = int(np.max(ys_all) - np.min(ys_all) + 1)
+            cw = int(np.max(xs_all) - np.min(xs_all) + 1)
+            left_strip = c_ink[:, : min(8, c_ink.shape[1])]
+            lys = np.where(left_strip > 0)[0]
+            left_h = (int(np.max(lys) - np.min(lys) + 1)) if len(lys) > 0 else 99
+            if ch <= 30 and cw >= 38 and (cw / float(max(1, ch))) >= 1.75 and left_h <= 8:
+                h_char = ""
+                for (hx, hy, hw, hh, harea) in harakat_list:
+                    hcx = hx + hw * 0.5
+                    hcy = hy + hh * 0.5
+                    if (x0 - 15 <= hcx <= x1 + 15) and (y0 - 45 <= hcy <= y1 + 45):
+                        if hcy > y0 + np.max(ys_all):
+                            h_char = "\u0650"
+                        elif hh <= 10 and harea <= 56:
+                            h_char = "\u064e"
+                        elif harea >= 92:
+                            h_char = "\u0652"
+                        else:
+                            h_char = "\u064f"
+                syllable_cells[(row_idx, c_i)] = h_char
+
+    if not grid_rows:
+        return {"text": "", "cells": [], "rows_table": []}
+
+    cell_gap = 56
+    row_gap = 36
+    pad = 32
+    row_strips = []
+    cell_boxes = {}
+    orig_cell_rects = {}
+    max_w = 60
+    for r_i, (y0, y1, cells) in enumerate(grid_rows):
+        rh = max(56, y1 - y0 + 16)
+        total_cw = sum((x1 - x0) for (x0, x1) in cells) + cell_gap * max(0, len(cells) - 1)
+        max_w = max(max_w, total_cw)
+        row_strips.append((r_i, y0, y1, rh, cells))
+
+    total_h = sum(x[3] for x in row_strips) + row_gap * max(0, len(row_strips) - 1)
+    comp_canvas = np.full((total_h + pad * 2, max_w + pad * 2, 3), 255, dtype=np.uint8)
+
+    cur_y = pad
+    for (r_i, y0, y1, rh, cells) in row_strips:
+        cur_x_right = pad + max_w
+        y_off = cur_y + (rh - (y1 - y0)) // 2
+        for c_i, (x0, x1) in enumerate(cells):
+            cw = x1 - x0
+            cx0 = cur_x_right - cw
+            cx1 = cur_x_right
+            comp_canvas[y_off : y_off + (y1 - y0), cx0:cx1] = ocr_canvas[y0:y1, x0:x1]
+            if (r_i, c_i) in syllable_cells:
+                base_cy = y_off + (y1 - y0) - 2
+                comp_canvas[max(0, base_cy - 38) : base_cy + 1, cx0 : cx0 + 6] = (20, 20, 20)
+            cell_boxes[(r_i, c_i)] = (cur_y, cur_y + rh, cx0, cx1)
+            orig_cell_rects[(r_i, c_i)] = (int(x0), int(y0), int(x1 - x0), int(y1 - y0))
+            cur_x_right = cx0 - cell_gap
+        cur_y += rh + row_gap
+
+    comp_072 = cv2.resize(comp_canvas, (0, 0), fx=0.72, fy=0.72, interpolation=cv2.INTER_AREA)
     with tempfile.TemporaryDirectory() as tmpdir:
-        padded = cv2.copyMakeBorder(clean_patch, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(255, 255, 255))
-        img_path = os.path.join(tmpdir, "crop.png")
+        img_path_1 = os.path.join(tmpdir, "c1.png")
+        img_path_2 = os.path.join(tmpdir, "c2.png")
         out_json = os.path.join(tmpdir, "ocr.json")
-        cv2.imwrite(img_path, padded)
+        cv2.imwrite(img_path_1, comp_canvas)
+        cv2.imwrite(img_path_2, comp_072)
 
         ps_script = f"""
 $ErrorActionPreference = 'Stop'
@@ -678,35 +852,39 @@ Function Await($WinRtTask, $ResultType) {{
     $netTask.Result
 }}
 
-$file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync('{img_path}')) ([Windows.Storage.StorageFile])
-$stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
-$decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
-$bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
 $langObj = New-Object Windows.Globalization.Language('{lang}')
 $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($langObj)
 if ($null -eq $engine) {{
     $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
 }}
-$result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-$items = @()
-foreach ($line in $result.Lines) {{
-    $minX = 999999; $minY = 999999; $maxX = 0; $maxY = 0
-    foreach ($w in $line.Words) {{
-        $r = $w.BoundingRect
-        if ($r.X -lt $minX) {{ $minX = $r.X }}
-        if ($r.Y -lt $minY) {{ $minY = $r.Y }}
-        if (($r.X + $r.Width) -gt $maxX) {{ $maxX = $r.X + $r.Width }}
-        if (($r.Y + $r.Height) -gt $maxY) {{ $maxY = $r.Y + $r.Height }}
+
+Function RunOcrFile($p) {{
+    $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($p)) ([Windows.Storage.StorageFile])
+    $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
+    $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+    $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+    $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
+    $words = @()
+    foreach ($line in $result.Lines) {{
+        foreach ($w in $line.Words) {{
+            $r = $w.BoundingRect
+            $words += @{{
+                text = $w.Text
+                x = [double]$r.X
+                y = [double]$r.Y
+                w = [double]$r.Width
+                h = [double]$r.Height
+            }}
+        }}
     }}
-    $items += @{{
-        text = $line.Text
-        x = [int]([Math]::Max(0, $minX - {pad}))
-        y = [int]([Math]::Max(0, $minY - {pad}))
-        w = [int]([Math]::Max(10, $maxX - $minX))
-        h = [int]([Math]::Max(10, $maxY - $minY))
-    }}
+    return $words
 }}
-$json = ConvertTo-Json -InputObject @($items) -Depth 4
+
+$outObj = @{{
+    w1 = @(RunOcrFile '{img_path_1}')
+    w2 = @(RunOcrFile '{img_path_2}')
+}}
+$json = ConvertTo-Json -InputObject $outObj -Depth 5
 [System.IO.File]::WriteAllText('{out_json}', $json, [System.Text.Encoding]::UTF8)
 """
         ps_file = os.path.join(tmpdir, "run_ocr.ps1")
@@ -717,48 +895,80 @@ $json = ConvertTo-Json -InputObject @($items) -Depth 4
             subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps_file],
                 check=True,
-                timeout=15,
+                timeout=18,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             if os.path.exists(out_json):
                 with open(out_json, "r", encoding="utf-8-sig") as f:
-                    raw = json.load(f)
-                if isinstance(raw, dict):
-                    raw = [raw]
-                cells = [c for c in (raw or []) if c and str(c.get("text", "")).strip()]
-                if not cells:
-                    return {"text": "", "cells": []}
+                    data = json.load(f)
 
-                # Group cells into horizontal rows by vertical center Y
-                cells.sort(key=lambda c: c["y"] + c["h"] * 0.5)
-                rows = []
-                for c in cells:
-                    cy = c["y"] + c["h"] * 0.5
-                    if not rows:
-                        rows.append([c])
-                    else:
-                        prev_row = rows[-1]
-                        prev_cy = sum(x["y"] + x["h"] * 0.5 for x in prev_row) / len(prev_row)
-                        avg_h = max(36, sum(x["h"] for x in prev_row) / len(prev_row))
-                        if abs(cy - prev_cy) <= avg_h * 0.85:
-                            prev_row.append(c)
-                        else:
-                            rows.append([c])
+                def assign_words(w_list, scale_f):
+                    cell_words = {k: [] for k in cell_boxes}
+                    if isinstance(w_list, dict):
+                        w_list = [w_list]
+                    for w_item in (w_list or []):
+                        if not w_item or not str(w_item.get("text", "")).strip():
+                            continue
+                        wcx = (float(w_item["x"]) + float(w_item["w"]) * 0.5) / scale_f
+                        wcy = (float(w_item["y"]) + float(w_item["h"]) * 0.5) / scale_f
+                        best_k = None
+                        best_d = 1e9
+                        for k, (cy0, cy1, cx0, cx1) in cell_boxes.items():
+                            if (cy0 - 20 <= wcy <= cy1 + 20) and (cx0 - 30 <= wcx <= cx1 + 30):
+                                d = abs(wcy - (cy0 + cy1) * 0.5) + abs(wcx - (cx0 + cx1) * 0.5) * 0.2
+                                if d < best_d:
+                                    best_d = d
+                                    best_k = k
+                        if best_k is not None:
+                            cell_words[best_k].append((wcx, str(w_item["text"]).strip()))
+                    out_txt = {}
+                    for k, wl in cell_words.items():
+                        wl.sort(key=lambda item: item[0], reverse=is_rtl)
+                        out_txt[k] = " ".join(item[1] for item in wl)
+                    return out_txt
 
-                is_rtl = lang.lower().startswith("ar")
+                t1 = assign_words(data.get("w1", []), 1.0)
+                t2 = assign_words(data.get("w2", []), 0.72)
+
                 ordered_cells = []
                 row_strings = []
-                for r in rows:
-                    # Sort columns RTL (right-to-left) for Arabic, LTR for English
-                    r.sort(key=lambda c: c["x"], reverse=is_rtl)
-                    ordered_cells.extend(r)
-                    row_strings.append("   |   ".join(c["text"].strip() for c in r))
+                rows_table = []
 
-                return {"text": "\n".join(row_strings), "cells": ordered_cells}
+                for r_i, (y0, y1, cells) in enumerate(grid_rows):
+                    row_cols = []
+                    for c_i in range(len(cells)):
+                        k = (r_i, c_i)
+                        s1 = t1.get(k, "").strip()
+                        s2 = t2.get(k, "").strip()
+                        chosen = s1
+                        if not s1:
+                            chosen = s2
+                        elif s2:
+                            w1_cnt = len(s1.split())
+                            w2_cnt = len(s2.split())
+                            if w1_cnt == w2_cnt and len(s2) > len(s1):
+                                chosen = s2
+                            elif w1_cnt > w2_cnt and len(s1.replace(" ", "")) <= 4 and len(s2) >= 3:
+                                chosen = s2
+
+                        if k in syllable_cells:
+                            base_let = chosen[0] if chosen else ""
+                            if base_let:
+                                chosen = base_let + syllable_cells[k] + "ـ"
+
+                        if chosen:
+                            ox, oy, ow, oh = orig_cell_rects[k]
+                            ordered_cells.append({"text": chosen, "x": ox, "y": oy, "w": ow, "h": oh})
+                            row_cols.append(chosen)
+                    if row_cols:
+                        rows_table.append(row_cols)
+                        row_strings.append("   |   ".join(row_cols))
+
+                return {"text": "\n".join(row_strings), "cells": ordered_cells, "rows_table": rows_table}
         except Exception:
-            return {"text": "", "cells": []}
-    return {"text": "", "cells": []}
+            return {"text": "", "cells": [], "rows_table": []}
+    return {"text": "", "cells": [], "rows_table": []}
 
 
 def ocr_image_patch(patch_bgr, lang="ar-SA"):

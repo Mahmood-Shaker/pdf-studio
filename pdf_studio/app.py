@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
 import engine
+import docx_exporter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKSPACE_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
@@ -43,6 +44,17 @@ STATE: Dict[str, Any] = {
         "total": 0,
         "status": "idle",
         "output_file": "",
+        "error": "",
+    },
+    # DOCX export job status
+    "docx_job": {
+        "running": False,
+        "current": 0,
+        "total": 0,
+        "status": "idle",
+        "output_file": "",
+        "download_url": "",
+        "size_kb": 0,
         "error": "",
     },
 }
@@ -330,10 +342,110 @@ def save_edited_pdf(payload: Dict[str, Any] = Body(...)):
 
 @app.get("/api/download/{filename}")
 def download_pdf(filename: str):
-    fpath = os.path.join(WORKSPACE_DIR, os.path.basename(filename))
+    safe_name = os.path.basename(filename)
+    fpath = os.path.join(WORKSPACE_DIR, safe_name)
     if not os.path.isfile(fpath):
         raise HTTPException(status_code=404, detail="File not found.")
-    return FileResponse(fpath, media_type="application/pdf", filename=os.path.basename(filename))
+    media = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        if safe_name.lower().endswith(".docx")
+        else "application/pdf"
+    )
+    return FileResponse(fpath, media_type=media, filename=safe_name)
+
+
+@app.post("/api/export_docx")
+def export_rtl_docx(payload: Dict[str, Any] = Body(...)):
+    """Start a background job to export the selected page or page range to an RTL (.docx) Word document with live progress."""
+    if STATE["docx_job"]["running"]:
+        raise HTTPException(status_code=400, detail="A Word export job is already running.")
+    if not STATE["pdf_path"]:
+        raise HTTPException(status_code=400, detail="No PDF open.")
+
+    start_page = max(1, int(payload.get("start_page", 1)))
+    end_page = min(STATE["page_count"], int(payload.get("end_page", start_page)))
+    if end_page < start_page:
+        end_page = start_page
+
+    mode = str(payload.get("mode", "hybrid"))  # "hybrid", "editable", or "visual"
+    font_name = str(payload.get("font_name", "Traditional Arabic"))
+    font_size_pt = int(payload.get("font_size_pt", 22))
+    out_name = str(payload.get("output_filename", "")).strip()
+    if not out_name:
+        base, _ = os.path.splitext(STATE["pdf_name"])
+        out_name = f"{base}_p{start_page}-{end_page}_rtl.docx" if start_page != end_page else f"{base}_p{start_page}_rtl.docx"
+    if not out_name.lower().endswith(".docx"):
+        out_name += ".docx"
+
+    total_pages = end_page - start_page + 1
+    STATE["docx_job"] = {
+        "running": True,
+        "current": 0,
+        "total": total_pages,
+        "status": f"Starting RTL Word export (pages {start_page}–{end_page})...",
+        "output_file": out_name,
+        "download_url": "",
+        "size_kb": 0,
+        "error": "",
+    }
+
+    def docx_worker():
+        try:
+            word_doc = docx_exporter.create_rtl_document()
+            doc_pdf = pymupdf.open(STATE["pdf_path"])
+
+            for idx, pno in enumerate(range(start_page, end_page + 1)):
+                page_idx = pno - 1
+                STATE["docx_job"]["current"] = idx + 1
+                STATE["docx_job"]["status"] = f"Converting page {pno} of {end_page} ({idx + 1}/{total_pages})..."
+
+                page = doc_pdf[page_idx]
+                pix = page.get_pixmap(matrix=pymupdf.Matrix(3, 3))
+                img_np = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                orig_bgr = cv2.cvtColor(img_np[:, :, :3], cv2.COLOR_RGB2BGR)
+
+                blocks = STATE["page_blocks"].get(page_idx)
+                if blocks is None:
+                    blocks = engine.detect_text_blocks(orig_bgr)
+                    STATE["page_blocks"][page_idx] = blocks
+
+                if page_idx in STATE["committed_pages"]:
+                    rendered_bgr = STATE["committed_pages"][page_idx]
+                else:
+                    rendered_bgr = engine.render_blocks_on_page(orig_bgr, blocks, margin_trim=0.0)
+
+                docx_exporter.append_page_to_docx(
+                    word_doc,
+                    orig_bgr=orig_bgr,
+                    rendered_bgr=rendered_bgr,
+                    blocks=blocks,
+                    mode=mode,
+                    font_name=font_name,
+                    font_size_pt=font_size_pt,
+                    is_first_page=(idx == 0),
+                )
+
+            doc_pdf.close()
+            STATE["docx_job"]["status"] = "Saving .docx file..."
+            out_path = os.path.join(WORKSPACE_DIR, out_name)
+            word_doc.save(out_path)
+            size_kb = round(os.path.getsize(out_path) / 1024.0, 1)
+            STATE["docx_job"]["size_kb"] = size_kb
+            STATE["docx_job"]["download_url"] = f"/api/download/{out_name}"
+            STATE["docx_job"]["status"] = "completed"
+            STATE["docx_job"]["running"] = False
+        except Exception as e:
+            STATE["docx_job"]["error"] = str(e)
+            STATE["docx_job"]["status"] = "error"
+            STATE["docx_job"]["running"] = False
+
+    threading.Thread(target=docx_worker, daemon=True).start()
+    return {"status": "started", "output_file": out_name}
+
+
+@app.get("/api/export_docx_status")
+def get_export_docx_status():
+    return STATE["docx_job"]
 
 
 @app.post("/api/batch_start")
